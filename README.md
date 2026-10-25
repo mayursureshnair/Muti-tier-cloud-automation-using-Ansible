@@ -29,8 +29,8 @@ An automated infrastructure configuration project showing how to set up an **Ans
                       |  |   | public1 |   | public2 |                     |                 |  |
                       |  |   |10.0.1.51|   |10.0.1.164                     |                 |  |
                       |  |   +---------+   +---------+                     |                 |  |
-                      |  |   (Nginx, Git,  (Nginx, Git,                    |                 |  |
-                      |  |    Docker)       Docker)                        |                 |  |
+                      |  |  (Nginx, Git,   (Nginx, Git,                    |                 |  |
+                      |  | Docker, Python)   Docker)                       |                 |  |
                       |  +----------------------+--------------------------+-----------------+  |
                       |                         |                          |                    |
                       |                         v SSH                      |                    |
