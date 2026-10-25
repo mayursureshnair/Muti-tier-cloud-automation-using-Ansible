@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg">
   <!-- VPC -->
-  <rect x="50" y="30" width="1100" height="740" fill="none" stroke="#000" stroke-width="3"/>
-  <text x="60" y="55" font-family="Arial" font-size="24" fill="#000">VPC</text>
+  <rect x="50" y="30" width="1100" height="740" fill="none" stroke="#000000" stroke-width="3"/>
+  <text x="60" y="55" font-family="Arial" font-size="24" fill="#000000">VPC</text>
 
   <!-- Public Subnet -->
   <rect x="100" y="80" width="1000" height="250" fill="none" stroke="#1E90FF" stroke-width="2"/>
@@ -14,25 +14,25 @@
 
   <!-- EC2 Instances -->
   <!-- Controller -->
-  <rect x="180" y="150" width="150" height="80" fill="#D3D3D3" stroke="#000"/>
-  <text x="185" y="185" font-family="Arial" font-size="14" fill="#000">Ansible Controller</text>
+  <rect x="180" y="150" width="150" height="80" fill="#D3D3D3" stroke="#000000"/>
+  <text x="185" y="190" font-family="Arial" font-size="14" fill="#000000">Ansible Controller</text>
   <!-- Public Target 1 -->
-  <rect x="380" y="150" width="150" height="80" fill="#D3D3D3" stroke="#000"/>
-  <text x="385" y="185" font-family="Arial" font-size="14" fill="#000">Public Target 1</text>
+  <rect x="400" y="150" width="150" height="80" fill="#D3D3D3" stroke="#000000"/>
+  <text x="405" y="190" font-family="Arial" font-size="14" fill="#000000">Public Target 1</text>
   <!-- Public Target 2 -->
-  <rect x="580" y="150" width="150" height="80" fill="#D3D3D3" stroke="#000"/>
-  <text x="585" y="185" font-family="Arial" font-size="14" fill="#000">Public Target 2</text>
+  <rect x="620" y="150" width="150" height="80" fill="#D3D3D3" stroke="#000000"/>
+  <text x="625" y="190" font-family="Arial" font-size="14" fill="#000000">Public Target 2</text>
   <!-- Private Target -->
-  <rect x="380" y="530" width="150" height="80" fill="#D3D3D3" stroke="#000"/>
-  <text x="385" y="565" font-family="Arial" font-size="14" fill="#000">Private Target</text>
+  <rect x="400" y="530" width="150" height="80" fill="#D3D3D3" stroke="#000000"/>
+  <text x="405" y="570" font-family="Arial" font-size="14" fill="#000000">Private Target</text>
 
   <!-- NAT Gateway -->
-  <rect x="800" y="530" width="120" height="60" fill="#FFD700" stroke="#000"/>
-  <text x="805" y="565" font-family="Arial" font-size="14" fill="#000">NAT Gateway</text>
+  <rect x="820" y="530" width="120" height="60" fill="#FFD700" stroke="#000000"/>
+  <text x="825" y="565" font-family="Arial" font-size="14" fill="#000000">NAT Gateway</text>
 
   <!-- Arrow definitions -->
   <defs>
-    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+    <marker id="arrowhead-red" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
       <polygon points="0 0,10 3.5,0 7" fill="red"/>
     </marker>
     <marker id="arrowhead-purple" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
@@ -42,16 +42,16 @@
 
   <!-- SSH arrows (red) -->
   <!-- Controller to Public Target 1 -->
-  <line x1="330" y1="190" x2="380" y2="190" stroke="red" stroke-width="2" marker-end="url(#arrowhead)"/>
-  <text x="340" y="180" font-family="Arial" font-size="12" fill="red">SSH</text>
+  <line x1="330" y1="190" x2="400" y2="190" stroke="red" stroke-width="2" marker-end="url(#arrowhead-red)"/>
+  <text x="350" y="180" font-family="Arial" font-size="12" fill="red">SSH</text>
   <!-- Controller to Public Target 2 -->
-  <line x1="330" y1="190" x2="580" y2="190" stroke="red" stroke-width="2" marker-end="url(#arrowhead)"/>
-  <text x="460" y="180" font-family="Arial" font-size="12" fill="red">SSH</text>
+  <line x1="330" y1="190" x2="620" y2="190" stroke="red" stroke-width="2" marker-end="url(#arrowhead-red)"/>
+  <text x="470" y="180" font-family="Arial" font-size="12" fill="red">SSH</text>
   <!-- Controller to Private Target -->
-  <line x1="255" y1="230" x2="380" y2="570" stroke="red" stroke-width="2" marker-end="url(#arrowhead)"/>
-  <text x="280" y="420" font-family="Arial" font-size="12" fill="red">SSH</text>
+  <line x1="255" y1="230" x2="400" y2="570" stroke="red" stroke-width="2" marker-end="url(#arrowhead-red)"/>
+  <text x="260" y="430" font-family="Arial" font-size="12" fill="red">SSH</text>
 
   <!-- Outbound arrow (purple) -->
-  <line x1="530" y1="570" x2="800" y2="560" stroke="purple" stroke-width="2" marker-end="url(#arrowhead-purple)"/>
-  <text x="620" y="540" font-family="Arial" font-size="12" fill="purple">Outbound internet traffic</text>
+  <line x1="550" y1="570" x2="820" y2="560" stroke="purple" stroke-width="2" marker-end="url(#arrowhead-purple)"/>
+  <text x="630" y="540" font-family="Arial" font-size="12" fill="purple">Outbound internet traffic</text>
 </svg>
