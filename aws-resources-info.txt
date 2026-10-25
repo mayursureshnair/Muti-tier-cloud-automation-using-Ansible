@@ -1,0 +1,4 @@
+public subnet id: subnet-02dfff19452fc3458
+private subnet id: subnet-0b582505c5ce175fe
+ansible-controller-sg id: sg-0d3194b7754a1a98a
+ansible-managed-sg id: sg-084b0ff369087484e

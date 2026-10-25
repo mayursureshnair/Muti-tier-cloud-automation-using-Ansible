@@ -1,0 +1,51 @@
+ # You can change the number of instance to how much you desire, (even 100s of instances)
+ # Here I choosed total 4 instances beacuse I'm using free tier which only offers 8vCPUs.
+ # Each t3.micro is 2vCPU, 
+ # So I used:
+ # 1 instance for the controler 
+ # 2 for public target instances 
+ # Remaining 1 for private target instance 
+
+ # I included private servers in this project to show that ansible can configure both public and private servers
+ # Ansible is also Agentless, The only prerequsite is that ansible should be able to communicate passwordlessly.
+
+
+# For Ansible Controler Server
+
+aws ec2 run-instances \
+  --region us-east-1 \
+  --image-id resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id \
+  --instance-type t3.micro \
+  --count 1 \
+  --key-name ansible-lab-key \
+  --subnet-id subnet-02dfff19452fc3458 \
+  --security-group-ids sg-0d3194b7754a1a98a \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ansible-controller}]'
+
+ # For Public Target Servers
+ # If you want 100 instances, Just change the count to 100.
+
+aws ec2 run-instances \
+  --region us-east-1 \
+  --image-id resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id \
+  --instance-type t3.micro \
+  --count 2 \
+  --key-name ansible-lab-key \
+  --subnet-id subnet-02dfff19452fc3458 \
+  --security-group-ids sg-084b0ff369087484e \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ansible-public}]'
+
+ # For Private target Servers (Optional)
+ # You can change the instance count here as well
+ # No public IP needed here for private instance
+ 
+aws ec2 run-instances \
+  --region us-east-1 \
+  --image-id resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id \
+  --instance-type t3.micro \
+  --count 1 \
+  --key-name ansible-lab-key \
+  --subnet-id subnet-0b582505c5ce175fe \
+  --security-group-ids sg-084b0ff369087484e \
+  --no-associate-public-ip-address \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ansible-private}]'

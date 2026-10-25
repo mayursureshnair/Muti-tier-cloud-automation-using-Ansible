@@ -1,0 +1,50 @@
+---
+- name: Install Nginx on all servers
+  hosts: all
+  become: true
+  tasks:
+    - name: Install Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
+
+    - name: Start and enable Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+
+- name: Install Git and Docker on public servers
+  hosts: public
+  become: true
+  tasks:
+    - name: Install Git and Docker
+      ansible.builtin.apt:
+        name:
+          - git
+          - docker.io
+        state: present
+        update_cache: true
+
+    - name: Start and enable Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+- name: Install PostgreSQL on the private server
+  hosts: private
+  become: true
+  tasks:
+    - name: Install PostgreSQL
+      ansible.builtin.apt:
+        name: postgresql
+        state: present
+        update_cache: true
+
+    - name: Start and enable PostgreSQL
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+        enabled: true
