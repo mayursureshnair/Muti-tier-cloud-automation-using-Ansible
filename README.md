@@ -6,7 +6,7 @@ An automated infrastructure configuration project showing how to set up an **Ans
 
 ## 📌 Architecture Overview
 
-![Architecture Diagram](architecture.png)
+![Architecture Diagram](images/architecture-diagram.png)
 
 ### Key Highlights
 - **Agentless:** Ansible does not need any agent software installed on the target nodes—just standard OpenSSH and Python.
