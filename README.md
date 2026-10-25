@@ -7,49 +7,50 @@ An end-to-end infrastructure automation project demonstrating how to provision m
 ## 📌 Architecture & Design Overview
 
 ```
-                      +-------------------------------------------------------+
-                      |                 AWS VPC (10.0.0.0/16)                 |
-                      |                  [ansible-lab-vpc]                   |
-                      |                                                       |
-                      |  +-------------------------------------------------+  |
-                      |  |     Public Subnet (10.0.1.0/24)                |  |
-                      |  |                                                 |  |
-                      |  |   +---------------------+                       |  |
-                      |  |   | Ansible Controller  | (10.0.1.233)          |  |
-                      |  |   | [ansible-controller]|                       |  |
-                      |  |   +----------+----------+                       |  |
-                      |  |              |                                  |  |
-                      |  |       Passwordless SSH                          |  |
-                      |  |       (ed25519 keypair)                         |  |
-                      |  |              |                                  |  |
-                      |  |       +------+------+                           |  |
-                      |  |       |             |                           |  |
-                      |  |       v             v                           |  |
-                      |  |  +---------+   +---------+                      |  |
-                      |  |  | public1 |   | public2 |                      |  |
-                      |  |  |10.0.1.51|   |10.0.1.164                      |  |
-                      |  |  +---------+   +---------+                      |  |
-                      |  |  (Nginx, Git,  (Nginx, Git,                     |  |
-                      |  |   Docker)       Docker)                         |  |
-                      |  +---------------------+---------------------------+  |
-                      |                        |                              |
-                      |                        v SSH                          |
-                      |  +-------------------------------------------------+  |
-                      |  |     Private Subnet (10.0.2.0/24)               |  |
-                      |  |     [No Public IP]                              |  |
-                      |  |                                                 |  |
-                      |  |       +-------------------+                     |  |
-                      |  |       | private1          | (10.0.2.12)         |  |
-                      |  |       | [ansible-private] |                     |  |
-                      |  |       +-------------------+                     |  |
-                      |  |       (Nginx, PostgreSQL)                       |  |
-                      |  +-------------------------------------------------+  |
-                      +-------------------------------------------------------+
+                      +-------------------------------------------------------------------------+
+                      |                          AWS VPC (10.0.0.0/16)                          |
+                      |                           [ansible-lab-vpc]                             |
+                      |                                                                         |
+                      |  +-------------------------------------------------------------------+  |
+                      |  |                Public Subnet (10.0.1.0/24)                        |  |
+                      |  |                                                                   |  |
+                      |  |   +-----------------------+        +--------------------------+   |  |
+                      |  |   |  Ansible Controller   |        |       NAT Gateway        |   |  |
+                      |  |   | (10.0.1.233, Public IP)        | (Enables outbound access)|   |  |
+                      |  |   +-----------+-----------+        +------------+-------------+   |  |
+                      |  |               |                                 ^                 |  |
+                      |  |        Passwordless SSH                         | Outbound        |  |
+                      |  |        (ed25519 keypair)                        | Internet        |  |
+                      |  |               |                                 | Traffic         |  |
+                      |  |        +------+------+                          | (apt packages)  |  |
+                      |  |        |             |                          |                 |  |
+                      |  |        v             v                          |                 |  |
+                      |  |   +---------+   +---------+                     |                 |  |
+                      |  |   | public1 |   | public2 |                     |                 |  |
+                      |  |   |10.0.1.51|   |10.0.1.164                     |                 |  |
+                      |  |   +---------+   +---------+                     |                 |  |
+                      |  |   (Nginx, Git,  (Nginx, Git,                    |                 |  |
+                      |  |    Docker)       Docker)                        |                 |  |
+                      |  +----------------------+--------------------------+-----------------+  |
+                      |                         |                          |                    |
+                      |                         v SSH                      |                    |
+                      |  +-------------------------------------------------+-----------------+  |
+                      |  |                Private Subnet (10.0.2.0/24)     |                 |  |
+                      |  |                [No Public IP]                   +                 |  |
+                      |  |                                                                   |  |
+                      |  |        +---------------------+                                    |  |
+                      |  |        | private1            | (10.0.2.12)                        |  |
+                      |  |        | [ansible-private]   +------------------------------------+  |
+                      |  |        +---------------------+                                       |  |
+                      |  |        (Nginx, PostgreSQL)                                           |  |
+                      |  +-------------------------------------------------------------------+  |
+                      +-------------------------------------------------------------------------+
 ```
 
 ### Key Highlights
 - **Agentless Architecture:** Ansible requires zero custom agent daemons installed on managed target servers. Communication relies solely on standard OpenSSH and Python.
 - **Dynamic AMI Lookup:** EC2 instances are provisioned with official Ubuntu 24.04 LTS AMIs dynamically resolved via AWS Systems Manager (SSM) Parameter Store.
+- **NAT Gateway for Private Subnet Outbound Access:** A **NAT Gateway** attached to the public subnet allows instances in the private subnet (`private1`) to securely download packages and updates from the internet (`apt update`, installing `postgresql` and `nginx`) without assigning public IP addresses or exposing them to incoming internet traffic.
 - **Dual-Tier Subnet Support:** Manages both internet-facing servers (public subnet) and isolated backend servers (private subnet with `--no-associate-public-ip-address`).
 - **AWS Free-Tier Conscious:** Standard free-tier accounts offer a quota of 8 vCPUs. Using 4 `t3.micro` instances (2 vCPUs each) totals exactly 8 vCPUs.
 
@@ -254,5 +255,6 @@ ansible public1 -i inventory.ini -m command -a "python3 --version"
 ## 💡 Key Takeaways
 - **No Console Dependency:** Entire EC2 multi-instance environment is spin up rapidly with AWS CLI.
 - **Key-Based Trust:** Simple and reliable SSH public key deployment ensures secure passwordless communication for Ansible.
+- **NAT Gateway for Private Subnets:** Ensures isolated database servers can receive security updates and packages while preventing direct exposure to the public internet.
 - **Group Targeting:** Tailored playbooks deploy specific applications (e.g. databases on private nodes, web servers across all nodes, dev tools on public nodes) in a single run.
 - **Idempotency:** Re-running the playbook checks the current state and only applies changes if needed (`changed=0` on clean runs).
