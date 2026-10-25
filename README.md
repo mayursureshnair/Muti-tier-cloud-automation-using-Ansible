@@ -100,7 +100,7 @@ Configured two distinct subnets:
 
 ---
 
-### 1.3 EC2 Instances
+### 1.3 EC2 Instances using AWS CLI
 Launched 4 `t3.micro` Ubuntu 24.04 LTS instances:
 1. `ansible-controller` (`10.0.1.233`) — Control node running Ansible.
 2. `ansible-public` 1 (`10.0.1.51`) — Target public server.
