@@ -1,10 +1,10 @@
-# AWS Multi-Tier Cloud Automation with Ansible
+# Multi-Tier Cloud Automation Using Ansible
 
-An end-to-end infrastructure automation project demonstrating how to provision multi-tier AWS EC2 instances (both public and private subnets) using the AWS CLI, configure **passwordless SSH authentication**, and automate service provisioning using **Ansible playbooks** and **ad-hoc commands**.
+An automated infrastructure configuration project showing how to set up an **Ansible Controller** in AWS that communicates **passwordlessly via SSH** to configure multiple target servers across both **public** and **private** subnets.
 
 ---
 
-## 📌 Architecture & Design Overview
+## 📌 Architecture Overview
 
 ```
                       +-------------------------------------------------------------------------+
@@ -48,11 +48,11 @@ An end-to-end infrastructure automation project demonstrating how to provision m
 ```
 
 ### Key Highlights
-- **Agentless Architecture:** Ansible requires zero custom agent daemons installed on managed target servers. Communication relies solely on standard OpenSSH and Python.
-- **Dynamic AMI Lookup:** EC2 instances are provisioned with official Ubuntu 24.04 LTS AMIs dynamically resolved via AWS Systems Manager (SSM) Parameter Store.
-- **NAT Gateway for Private Subnet Outbound Access:** A **NAT Gateway** attached to the public subnet allows instances in the private subnet (`private1`) to securely download packages and updates from the internet (`apt update`, installing `postgresql` and `nginx`) without assigning public IP addresses or exposing them to incoming internet traffic.
-- **Dual-Tier Subnet Support:** Manages both internet-facing servers (public subnet) and isolated backend servers (private subnet with `--no-associate-public-ip-address`).
-- **AWS Free-Tier Conscious:** Standard free-tier accounts offer a quota of 8 vCPUs. Using 4 `t3.micro` instances (2 vCPUs each) totals exactly 8 vCPUs.
+- **Agentless:** Ansible does not need any agent software installed on the target nodes—just standard OpenSSH and Python.
+- **Passwordless SSH Setup:** An ED25519 keypair generated on the Ansible Controller allows seamless, non-interactive execution across all nodes.
+- **Public & Private Multi-Tier:** Demonstrates that Ansible can orchestrate both internet-facing servers and isolated private servers.
+- **NAT Gateway for Private Subnet:** A NAT Gateway in the public subnet allows the private server to download required packages (`postgresql`, `nginx`) from the internet without having a public IP or inbound internet exposure.
+- **Free Tier Budgeted:** Uses 4 `t3.micro` instances (2 vCPUs each = 8 vCPUs total), staying within the AWS free tier limit.
 
 ---
 
@@ -60,201 +60,166 @@ An end-to-end infrastructure automation project demonstrating how to provision m
 
 ```
 .
-├── aws-cli-commands.txt       # AWS CLI commands for provisioning Controller, Public, & Private nodes
+├── images/
+│   ├── 01-vpc.png
+│   ├── 02-subnets.png
+│   ├── 03-instances.png
+│   ├── 04-ssh-permission-denied.png
+│   ├── 05-ssh-keygen.png
+│   ├── 06-authorized-keys.png
+│   ├── 07-playbook-run-part1.png
+│   ├── 08-playbook-run-part2.png
+│   ├── 09-adhoc-verification.png
+│   └── 10-adhoc-python-install.png
+├── aws-cli-commands.txt       # Script used to launch all EC2 instances via CLI
 ├── aws-resources-info.txt     # Subnet and Security Group IDs reference
-├── inventory.ini              # Ansible inventory file grouping nodes into [public], [private], & [all]
-├── first-playbook.yml         # Main playbook deploying Nginx, Docker, Git, & PostgreSQL
-└── README.md                  # Comprehensive project documentation
+├── inventory.ini              # Grouped server hosts and connection variables
+├── first-playbook.yml         # Playbook automating software installation
+└── README.md
 ```
 
 ---
 
-## 🛠️ Step 1: AWS Infrastructure Provisioning via AWS CLI
+## 🛠️ Step 1: AWS Infrastructure Setup
 
-All instances use Ubuntu 24.04 LTS resolved dynamically via SSM:
-```
-resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
-```
+All resources were provisioned using AWS CLI commands instead of clicking through the console every time.
 
-### 1.1 Launch Ansible Controller Node
-```bash
-aws ec2 run-instances \
-  --region us-east-1 \
-  --image-id resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id \
-  --instance-type t3.micro \
-  --count 1 \
-  --key-name ansible-lab-key \
-  --subnet-id subnet-02dfff19452fc3458 \
-  --security-group-ids sg-0d3194b7754a1a98a \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ansible-controller}]'
-```
+### 1.1 Custom VPC
+Created a custom VPC named `ansible-lab-vpc` (`vpc-0b20b1a86c4801836`) with a CIDR block of `10.0.0.0/16` to isolate all lab resources.
 
-### 1.2 Launch Public Target Instances
-```bash
-aws ec2 run-instances \
-  --region us-east-1 \
-  --image-id resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id \
-  --instance-type t3.micro \
-  --count 2 \
-  --key-name ansible-lab-key \
-  --subnet-id subnet-02dfff19452fc3458 \
-  --security-group-ids sg-084b0ff369087484e \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ansible-public}]'
-```
-
-### 1.3 Launch Private Target Instance (No Public IP)
-```bash
-aws ec2 run-instances \
-  --region us-east-1 \
-  --image-id resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id \
-  --instance-type t3.micro \
-  --count 1 \
-  --key-name ansible-lab-key \
-  --subnet-id subnet-0b582505c5ce175fe \
-  --security-group-ids sg-084b0ff369087484e \
-  --no-associate-public-ip-address \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ansible-private}]'
-```
+![VPC Setup](images/01-vpc.png)
 
 ---
 
-## 🔑 Step 2: Configuring Passwordless SSH Authentication
+### 1.2 Public and Private Subnets
+Configured two distinct subnets:
+- **`ansible-public-subnet`** (`10.0.1.0/24`): Hosts the Ansible Controller and public web servers. Attached to an Internet Gateway and NAT Gateway.
+- **`ansible-private-subnet`** (`10.0.2.0/24`): Hosts the private database server with no public IP address, routing outbound traffic through the NAT Gateway.
 
-Ansible connects to remote machines over SSH. When initially attempting SSH connection from the Controller node to target nodes, authentication fails (`Permission denied (publickey)`).
-
-### 2.1 Generate ED25519 Keypair on Ansible Controller
-Log into the Controller (`10.0.1.233`) and generate a keypair without a passphrase:
-```bash
-ssh-keygen -t ed25519
-```
-*Key generated:* `~/.ssh/id_ed25519` and `~/.ssh/id_ed25519.pub`.
-
-### 2.2 Distribute Public Key to All Target Nodes
-View the public key on the Controller:
-```bash
-cat ~/.ssh/id_ed25519.pub
-```
-
-On each target server (`public1: 10.0.1.51`, `public2: 10.0.1.164`, `private1: 10.0.2.12`):
-```bash
-echo "<COPIED_ED25519_PUBLIC_KEY>" >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-```
-
-### 2.3 Verify Passwordless Connectivity from Controller
-```bash
-ssh ubuntu@10.0.1.51
-ssh ubuntu@10.0.1.164
-ssh ubuntu@10.0.2.12
-```
-All targets connect instantly without prompting for passwords or key flags.
+![Subnets Setup](images/02-subnets.png)
 
 ---
 
-## ⚙️ Step 3: Ansible Installation & Configuration
+### 1.3 EC2 Instances
+Launched 4 `t3.micro` Ubuntu 24.04 LTS instances:
+1. `ansible-controller` (`10.0.1.233`) — Control node running Ansible.
+2. `ansible-public` 1 (`10.0.1.51`) — Target public server.
+3. `ansible-public` 2 (`10.0.1.164`) — Target public server.
+4. `ansible-private` (`10.0.2.12`) — Target private database server (no public IP).
 
-On the Ansible Controller node:
-```bash
-sudo apt update && sudo apt install ansible -y
-ansible --version
-```
-
-### 3.1 Inventory Configuration (`inventory.ini`)
-Defines managed targets divided into groups and specifies connection user:
-
-```ini
-[public]
-public1 ansible_host=10.0.1.51
-public2 ansible_host=10.0.1.164
-
-[private]
-private1 ansible_host=10.0.2.12
-
-[all:children]
-public
-private
-
-[all:vars]
-ansible_user=ubuntu
-```
+![EC2 Instances](images/03-instances.png)
 
 ---
 
-## 🚀 Step 4: Playbook Execution
+## 🔑 Step 2: Passwordless SSH Setup
 
-The playbook [`first-playbook.yml`](first-playbook.yml) orchestrates services across different server tiers:
-1. **All nodes (`all`):** Installs, enables, and starts **Nginx**.
-2. **Public nodes (`public`):** Installs **Git** and **Docker**, then starts and enables Docker daemon.
-3. **Private nodes (`private`):** Installs, enables, and starts **PostgreSQL**.
+For Ansible to manage nodes without manual intervention, the controller node must communicate with all target servers without being prompted for a password or key each time.
 
-### Run the Playbook:
+### 2.1 The Issue: Permission Denied
+When attempting to SSH from the controller (`10.0.1.233`) into the target servers (`10.0.1.51`, `10.0.1.164`, `10.0.2.12`), the connection was rejected with `Permission denied (publickey)` because the controller's key was not yet trusted by the targets.
+
+![Permission Denied](images/04-ssh-permission-denied.png)
+
+---
+
+### 2.2 Generating ED25519 Key on Controller
+On the `ansible-controller` server:
+1. Checked Ansible version (`ansible [core 2.16.3]`, Python 3.12.3).
+2. Generated a dedicated ED25519 SSH keypair with no passphrase using:
+   ```bash
+   ssh-keygen -t ed25519
+   ```
+
+![SSH Keygen](images/05-ssh-keygen.png)
+
+---
+
+### 2.3 Adding Public Key to All Target Servers
+Copied the public key from the controller (`~/.ssh/id_ed25519.pub`) and appended it into `~/.ssh/authorized_keys` on each target server (`public1`, `public2`, and `private1`).
+
+Below you can see the controller's ED25519 key successfully added to `~/.ssh/authorized_keys` alongside the original AWS keypair:
+
+![Authorized Keys](images/06-authorized-keys.png)
+
+After this step, the controller can connect to all target nodes passwordlessly!
+
+---
+
+## 🚀 Step 3: Running the Ansible Playbook
+
+On the controller node, created the project directory with:
+- **`inventory.ini`**: Configures `public` and `private` host groups:
+  ```ini
+  [public]
+  public1 ansible_host=10.0.1.51
+  public2 ansible_host=10.0.1.164
+
+  [private]
+  private1 ansible_host=10.0.2.12
+
+  [all:children]
+  public
+  private
+
+  [all:vars]
+  ansible_user=ubuntu
+  ```
+- **`first-playbook.yml`**: Automates:
+  - **All servers**: Installs, enables, and starts **Nginx**.
+  - **Public servers**: Installs **Git** and **Docker**, then starts and enables the Docker service.
+  - **Private servers**: Installs, enables, and starts **PostgreSQL** (downloaded via NAT Gateway).
+
+### 3.1 Executing the Playbook
+Executed the playbook using:
 ```bash
 ansible-playbook -i inventory.ini first-playbook.yml
 ```
 
-### Output Summary:
-```text
-PLAY RECAP *********************************************************************************
-private1    : ok=6    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
-public1     : ok=6    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
-public2     : ok=6    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
-```
+The first phase gathers facts, installs Nginx across all servers, and starts the Nginx service:
+
+![Playbook Execution Part 1](images/07-playbook-run-part1.png)
 
 ---
 
-## ⚡ Step 5: Verification & Ad-Hoc Commands
+### 3.2 Playbook Completion & Summary
+The playbook proceeds to install Git and Docker on the public nodes, and PostgreSQL on the private node. The play recap shows **100% success** with zero failures or unreachable hosts:
 
-Ansible ad-hoc commands execute quick single tasks across one or more target groups without writing a playbook.
+![Playbook Execution Part 2](images/08-playbook-run-part2.png)
 
-### 5.1 Playbook vs Ad-Hoc Commands
-| Type | Best Used For | Execution Style |
-| :--- | :--- | :--- |
-| **Playbook** | Multi-step deployments, orchestration, repeatable configuration state | Declarative YAML file (`ansible-playbook`) |
-| **Ad-Hoc Commands** | Quick checks, single package installations, one-off service restarts | Single CLI command (`ansible <group> -m <module> -a "<args>"`) |
+---
 
-### 5.2 Verification Ad-Hoc Commands
+## ⚡ Step 4: Verification Using Ad-Hoc Commands
 
-#### Check Git Version on Public Servers
-```bash
-ansible public -i inventory.ini -m command -a "git --version"
-```
-*Output: `git version 2.43.0` on `public1` and `public2`.*
+While **Playbooks** are used when there are many multi-step tasks, **Ad-Hoc Commands** are ideal for quick checks, one-off service restarts, or single package installs.
 
-#### Verify Nginx Service Status Across All Servers
-```bash
-ansible all -i inventory.ini -m shell -a "systemctl is-active nginx"
-```
-*Output: `active` on `public1`, `public2`, and `private1`.*
+### 4.1 Verifying Installed Packages and Service Status
+Used ad-hoc commands with the `command` and `shell` modules to verify all installations across the server groups:
+- **Git version on public servers:** `ansible public -i inventory.ini -m command -a "git --version"` → `git version 2.43.0`
+- **Nginx status on all servers:** `ansible all -i inventory.ini -m shell -a "systemctl is-active nginx"` → `active` on all 3 nodes
+- **Docker version on public servers:** `ansible public -i inventory.ini -m command -a "docker --version"` → `Docker version 29.1.3`
+- **PostgreSQL status on private server:** `ansible private -i inventory.ini -m shell -a "systemctl is-active postgresql"` → `active` on `private1`
 
-#### Check Docker Version on Public Servers
-```bash
-ansible public -i inventory.ini -m command -a "docker --version"
-```
-*Output: `Docker version 29.1.3` on `public1` and `public2`.*
+![Ad-Hoc Verification](images/09-adhoc-verification.png)
 
-#### Verify PostgreSQL Service on Private Server
-```bash
-ansible private -i inventory.ini -m shell -a "systemctl is-active postgresql"
-```
-*Output: `active` on `private1`.*
+---
 
-### 5.3 One-Off Package Installation via Ad-Hoc Command
-To install `python3` on `public1` using elevated privileges (`-b` / become):
+### 4.2 Installing Python via Ad-Hoc Command
+To demonstrate a quick one-off installation without modifying the playbook, installed `python3` on `public1` using the `apt` module with privilege escalation (`-b`):
 ```bash
 ansible public1 -i inventory.ini -b -m apt -a "name=python3 state=present update_cache=yes"
 ```
-
-Verify Python installation:
+Then verified the version:
 ```bash
 ansible public1 -i inventory.ini -m command -a "python3 --version"
 ```
-*Output: `Python 3.12.3`.*
+Output confirmed `Python 3.12.3`.
+
+![Ad-Hoc Python Installation](images/10-adhoc-python-install.png)
 
 ---
 
-## 💡 Key Takeaways
-- **No Console Dependency:** Entire EC2 multi-instance environment is spin up rapidly with AWS CLI.
-- **Key-Based Trust:** Simple and reliable SSH public key deployment ensures secure passwordless communication for Ansible.
-- **NAT Gateway for Private Subnets:** Ensures isolated database servers can receive security updates and packages while preventing direct exposure to the public internet.
-- **Group Targeting:** Tailored playbooks deploy specific applications (e.g. databases on private nodes, web servers across all nodes, dev tools on public nodes) in a single run.
-- **Idempotency:** Re-running the playbook checks the current state and only applies changes if needed (`changed=0` on clean runs).
+## 💡 Summary
+1. **AWS CLI Provisioning:** Rapidly stood up a custom VPC, public/private subnets, and 4 EC2 instances.
+2. **Passwordless Setup:** Generated ED25519 key on the controller and distributed the public key to all targets.
+3. **NAT Gateway Routing:** Allowed isolated private servers to fetch software packages from the web safely.
+4. **Ansible Automation:** Executed structured group deployments via playbooks and performed real-time inspection & single-task package management via ad-hoc commands.
