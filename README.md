@@ -1,4 +1,4 @@
-# Multi-Tier Cloud Automation Using Ansible
+# AWS Multi-Server Configuration Management with Ansible
 
 An automated infrastructure configuration project showing how to set up an **Ansible Controller** in AWS that communicates **passwordlessly via SSH** to configure multiple target servers across both **public** and **private** subnets.
 
