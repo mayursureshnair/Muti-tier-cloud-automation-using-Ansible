@@ -180,7 +180,7 @@ Output confirmed `Python 3.12.3`.
 ---
 
 ## 💡 Summary
-1. **AWS CLI Provisioning:** Rapidly stood up multiple EC2 instances.
+1. **AWS CLI Provisioning:** Rapidly stood up multiple EC2 instances via CLI and rest of the infrastructure using the console.
 2. **Passwordless Setup:** Generated ED25519 key on the controller and distributed the public key to all targets.
 3. **NAT Gateway Routing:** Allowed isolated private servers to fetch software packages from the web safely.
 4. **Ansible Automation:** Executed structured group deployments via playbooks and performed real-time inspection & single-task package management via ad-hoc commands.
